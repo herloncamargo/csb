@@ -1,0 +1,6 @@
+Módulo cria_socket.py
+===============================================================================
+
+.. automodule:: modules.cria_socket
+   :members:
+

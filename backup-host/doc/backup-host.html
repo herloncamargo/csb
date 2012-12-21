@@ -1,0 +1,182 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Script backup_host.py &mdash; Servidor Central de Backup 0.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Servidor Central de Backup 0.0.1 documentation" href="index.html" />
+    <link rel="next" title="Módulo compacta.py" href="compacta.html" />
+    <link rel="prev" title="Bem-vindo a documentação do Servidor Central de Backup!" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="compacta.html" title="Módulo compacta.py"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Bem-vindo a documentação do Servidor Central de Backup!"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Servidor Central de Backup 0.0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="script-backup-host-py">
+<h1>Script backup_host.py<a class="headerlink" href="#script-backup-host-py" title="Permalink to this headline">¶</a></h1>
+<p>Conteúdo:</p>
+<span class="target" id="module-backup_host"></span><p>Este script deverá ser executado na máquina onde será realizado o backup.
+Ele recebe uma solicitação do servidor central de backups contendo uma relação
+de arquivos que deverão ser importados para o servidor, onde serão armazenados
+como backup. Para o servidor de backup acessar a máquina onde este script está
+sendo executado, ele necessitará informar a senha de acesso. Esta senha está
+configurada no arquivo &#8220;settings.py&#8221; juntamente com as configurações do
+endereço de porta utilizado por este script, a localização da chave privada e
+do certificado para critografia da conexão com o servidor, e o diretório para
+armazenamento local do arquivo de backup. Além de enviar uma cópia para o
+servidor de backup, este script também permite que uma cópia fique armazenada
+na mesma máquina onde ele está sendo executado.</p>
+<p>Para que este script execute em toda sua plenitude, ele deverá receber
+permissão de superusuário na sua execução. Com isso, ele poderá acessar todos
+os arquivos na máquina onde é executado e enviar qualquer arquivo que for
+solicitado pelo servidor de backup. Além disso, ele poderá salvar a cópia local
+do backup em qualquer diretório.</p>
+<p>Por ser um script que ficará rodando indefinidamente a espera de contato do
+servidor de backup, ele é executado em segundo plano como um daemon. Se o
+usuário achar necessário, ele poderá ser invocado já na inicialização do
+sistema.</p>
+<p>Toda a atividade deste script é registrada no arquivo de log &#8220;backup-host.log&#8221;
+localizado no mesmo diretório onde se encontra este script. Maiores informações
+podem ser obitdas no arquivo README.</p>
+<p>Sua sintaxe de uso é:</p>
+<blockquote>
+<div><p>backup_host -h                    : para exibir informações</p>
+<p>sudo backup_host.py</p>
+</div></blockquote>
+<p>Autor: Herlon Ayres Camargo
+Data: 16/10/2012</p>
+<dl class="function">
+<dt id="backup_host.backup">
+<tt class="descclassname">backup_host.</tt><tt class="descname">backup</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/backup_host.html#backup"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#backup_host.backup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Função que recebe do servidor de backup uma relação de arquivos que
+serão becapeados e devolve a esse servidor um arquivo compactado contendo
+todos os arquivos solicitados, além de armazenar localmente uma cópia desse
+arquivo. Antes de atender a solicitação do servidor de backup, verifica se
+a senha informada está correta.</p>
+</dd></dl>
+
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="compacta.html">Módulo compacta.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cria_socket.html">Módulo cria_socket.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gera_log.html">Módulo gera_log.py</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-e-tabelas">
+<h1>Índices e tabelas<a class="headerlink" href="#indices-e-tabelas" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
+<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
+<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Script backup_host.py</a><ul>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-e-tabelas">Índices e tabelas</a></li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Bem-vindo a documentação do Servidor Central de Backup!</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="compacta.html"
+                        title="next chapter">Módulo compacta.py</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/backup-host.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="compacta.html" title="Módulo compacta.py"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Bem-vindo a documentação do Servidor Central de Backup!"
+             >previous</a> |</li>
+        <li><a href="index.html">Servidor Central de Backup 0.0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2012, Herlon Camargo.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

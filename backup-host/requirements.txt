@@ -1,0 +1,2 @@
+python-daemon==1.5.5
+pyOpenSSL==0.12

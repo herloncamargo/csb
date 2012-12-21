@@ -1,0 +1,169 @@
+                        Servidor Central de Backup
+
+
+1 - Introdução
+
+Esta aplicação é constituída de dois scritps principais: "backup-server.py" e
+"backup-host.py". O script "backup_server.py" é instalado na máquina que será o
+Servidor Central de Backup, enquanto que o script "backup_host.py" é instalado
+nos hosts que serão alvo de backup.
+
+1.1 - Características
+
+- Desenvolvido de forma modular.
+- Usa criptografia SSL nas conexões.
+- Pode-se compactar arquivos individualmente, diretórios inteiros com
+recursividade e arquivos originados de um filtro de pesquisa.
+- Não há limitação do tamanho do arquivo de backup, pois o mesmo é gravado
+diretamente em disco.
+- Possui registo das atividades realizadas, gravadas em arquivos de log. 
+
+
+2 - Script "backup_host.py"
+
+O script "backup_host.py" é um daemon que fica rodando indefinidamente a espera
+de contato do servidor de backup, sendo portanto executado em segundo plano.
+Caso o usuário julgar necessário, ele poderá ser invocado já na inicialização
+do host. Sua função consiste em receber uma solicitação do host servidor de
+backups contendo uma relação de arquivos que deverão ser importados para o
+servidor, onde serão armazenados como backup.
+
+2.1 - Instalação
+
+O script principal "backup_host.py" é acompanhado dos módulos "gera-log.py",
+"cria_socket.py" e "compacta.py". Estes módulos devem ficar localizados num
+subdiretório chamado "modules". Uma forma automatizada de se instalar a parte
+cliente da solução seria descompactar o arquivo através do seguinte comando:
+
+    tar -xjbf backup-host.tar.bz2
+    
+A estrutura criada seria:
+
+    ./backup-host 
+            |--------- backup_host.py
+            |--------- backup-host.log
+            |--------- README
+            |--------- requirements.txt
+            |--------- settings.py
+            |modules
+                |---------- __init__.py
+                |---------- compacta.py
+                |---------- cria_socket.py
+                |---------- gera_log.py
+
+2.2 - Funcionamento
+
+Para o servidor de backup acessar o host onde o script "backup_host.py" está
+sendo executado, ele necessitará informar uma senha de acesso. Esta senha está
+configurada no arquivo "settings.py", que acompanha este script, juntamente com
+as configurações do endereço de porta utilizado por este script, a localização
+da chave privada e do certificado para critografia da conexão com o servidor, e
+o diretório para armazenamento local do arquivo de backup. Além de enviar uma
+cópia para o servidor de backup, este script também permite que uma cópia fique
+armazenada no mesmo host onde ele está sendo executado.
+
+Para que este script execute em toda sua plenitude, ele deverá receber
+permissão de superusuário na sua execução. Com isso, ele poderá acessar todos
+os arquivos no host onde é executado e enviar qualquer arquivo que for
+solicitado pelo servidor de backup. Além disso, ele poderá salvar a cópia local
+do backup em qualquer diretório.
+
+Toda a atividade deste script é registrada no arquivo de log "backup-host.log"
+localizado no mesmo diretório onde se encontra este script.
+
+2.3 - Modo de uso
+
+Sua sintaxe de uso é:
+
+    backup_host -h                    : para exibir informações
+    sudo backup_host.py
+
+
+3 - Script "backup_server.py"
+
+O "backup_server.py" consiste de um script que é executado via linha de comando
+sempre que se desejar fazer algum backup nos hosts remotos previamente
+configurados. Sua função consiste em fazer uma solicitação ao host remoto alvo
+do backup contendo uma relação de arquivos que deverão ser fornecidos pelo host
+para serem becapeados.
+
+3.1 - Instalação
+
+O script principal "backup_server.py" é acompanhado dos módulos "gera-log.py" e
+"cria_socket.py". Estes módulos devem ficar localizados num subdiretório
+chamado "modules". Também num subdiretório chamado "hosts", ficam os arquivos
+individuais de configurações referentes a cada host alvo do backup. Uma forma
+automatizada de se instalar a parte servidora da solução seria descompactar o
+arquivo através do seguinte comando:
+
+    tar -xjbf backup-server.tar.bz2
+    
+A estrutura criada seria:
+
+    ./backup-server 
+            |--------- backup_server.py
+            |--------- backup-server.log
+            |--------- README
+            |--------- requirements.txt
+            |--------- settings.py
+            |modules
+                |---------- __init__.py
+                |---------- cria_socket.py
+                |---------- gera_log.py
+            |hosts
+                |---------- __init__.py
+                |---------- maq_exemplo.py
+
+3.2 - Funcionamento
+
+O script "backup_server.py" é executado na máquina que será o servidor de
+backup. Ele envia uma requisição às máquinas remotas solicitando determinados
+arquivos para serem becapeados, e os recebe num único arquivo compactado,
+armazenando-os num diretório previamente especificado no arquivo "settings.py".
+
+Para saber quais arquivos serão solicitados e de quais máquinas, este script
+consulta o subdiretório "hosts", que contém arquivos individuais com as
+respectivas configurações referentes a cada máquina remota. Esses arquivos de
+configurações individuais contém informações como o endereço ip e porta do host
+alvo do backup, a senha de acesso ao serviço que receberá as solicitações no
+host alvo, e a relação de arquivos para serem trazidos como backup.
+
+As conexões entre este script e as máquinas remotas são feitas de forma
+criptografada, sendo essas máquinas as possuidoras da chave e do certificado
+responsáveis pela criptografia. Assim que a conexão entre servidor e hosts se
+inicia, uma senha é enviada para que o host a valide. Caso o servidor receba
+uma mensagem de sucesso, ele envia uma relação de arquivos que deverão ser
+compacatados e becapeados. O host retorna o nome do arquivo compactado e em
+seguida envia o arquivo compactado. O servidor recebe esse arquivo e o armazena
+num diretório especificado no "arquivo settings.py".
+
+Não há necessidade que esse script seja executado com poderes de superusuário,
+a menos que se deseje armazenar os arquivos de backup em lugares restritos ao
+superusuário. Este script não necessita ser executado como um daemon e pode ser
+inserido sem problemas em agendadores de tarefas como o Cron.
+
+Toda atividade deste script é registrada no arquivo de log "backup-server.log"
+localizado no mesmo diretório onde se encontra este script. Maiores
+informações, bem como detalhes dos arquivos individuais de configuração dos
+hosts alvos, podem ser obitdos no arquivo README.
+
+Sua sintaxe de uso é:
+
+    backup_server.py -h        : para exibir informações
+    backup_server.py
+
+3.3 - Arquivo de configuração dos hosts
+
+Os arquivos de configuração individuais dos hosts permitem armazenar
+informações específicas referentes a cada host. O endereço "IP", a "PORTA"
+utilizada pelo socket, a "SENHA" de acesso e a relação de "ARQUIVOS" que serão
+solicitados para backup podem ser configurados diretamente nesse arquivo. A
+variável ARQUIVOS aceita nomes absolutos de arquivos e diretórios, além de
+caracteres curinga do módulo "glob" do Python. O arquivo "maq_exemplo.py" é um
+exemplo funcional de configurguração dos parâmetros de um host alvo de backup.
+
+
+4 - Informações sobre o autor
+
+Nome: Herlon Camargo
+e-mail: herloncamargo@gmail.com

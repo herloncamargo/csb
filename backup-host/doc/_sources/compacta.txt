@@ -1,0 +1,6 @@
+Módulo compacta.py
+===============================================================================
+
+.. automodule:: modules.compacta
+   :members:
+

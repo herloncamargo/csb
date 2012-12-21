@@ -1,0 +1,257 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>backup_server &mdash; Servidor Central de Backup 0.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Servidor Central de Backup 0.0.1 documentation" href="../index.html" />
+    <link rel="up" title="Module code" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">Servidor Central de Backup 0.0.1 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for backup_server</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="c"># encoding: utf-8</span>
+<span class="sd">&#39;&#39;&#39; Este script deverá ser executado na máquina que será o servidor central de</span>
+<span class="sd">backup. Ele enviará uma requisição às máquinas remotas solicitando determinados</span>
+<span class="sd">arquivos para serem becapeados, e os receberá num único arquivo compactado</span>
+<span class="sd">armazenando-os num diretório previamente especificado no arquivo &quot;settings.py&quot;.</span>
+
+<span class="sd">Para saber quais arquivos serão solicitados e de quais máquinas, este script</span>
+<span class="sd">consulta o subdiretório &quot;hosts&quot;, que contém arquivos individuais com as</span>
+<span class="sd">respectivas configurações referentes a cada máquina remota. Esses arquivos de</span>
+<span class="sd">configurações individuais contém informações como o endereço ip e porta do host</span>
+<span class="sd">alvo do backup, a senha de acesso ao serviço que receberá as solicitações no</span>
+<span class="sd">host alvo, e a relação de arquivos para serem trazidos como backup.</span>
+
+<span class="sd">As conexões entre este script e as máquinas remotas são feitas de forma</span>
+<span class="sd">criptografada, sendo essas máquinas as possuidoras da chave e do certificado</span>
+<span class="sd">responsáveis pela criptografia.</span>
+
+<span class="sd">Não há necessidade que esse script seja executado com poderes de superusuário,</span>
+<span class="sd">a menos que se deseje armazenar os arquivos de backup em lugares restritos ao</span>
+<span class="sd">superusuário. Este script não necessita ser executado como um daemon e pode ser</span>
+<span class="sd">inserido sem problemas em agendadores de tarefas como o Cron.</span>
+
+<span class="sd">Toda atividade deste script é registrada no arquivo de log &quot;backup-server.log&quot;</span>
+<span class="sd">localizado no mesmo diretório onde se encontra este script. Maiores</span>
+<span class="sd">informações, bem como detalhes dos arquivos individuais de configuração dos</span>
+<span class="sd">hosts alvos, podem ser obitdos no arquivo README.</span>
+
+<span class="sd">Sua sintaxe de uso é:</span>
+
+<span class="sd">    backup_server.py -h        : para exibir informações</span>
+
+<span class="sd">    backup_server.py</span>
+
+<span class="sd">Autor: Herlon Ayres Camargo</span>
+<span class="sd">Data: 16/10/2012</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">ipaddr</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">socket</span>
+<span class="kn">import</span> <span class="nn">ssl</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">argv</span>
+<span class="kn">from</span> <span class="nn">settings</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">modules.cria_socket</span> <span class="kn">import</span> <span class="n">cria_socket</span>
+<span class="kn">from</span> <span class="nn">modules.gera_log</span> <span class="kn">import</span> <span class="n">gera_log</span>
+
+
+<div class="viewcode-block" id="backup"><a class="viewcode-back" href="../backup-server.html#backup_server.backup">[docs]</a><span class="k">def</span> <span class="nf">backup</span><span class="p">(</span><span class="n">ip</span><span class="p">,</span> <span class="n">porta</span><span class="p">,</span> <span class="n">senha</span><span class="p">,</span> <span class="n">arquivos</span><span class="p">,</span> <span class="n">local</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Função que solicita ao host alvo os arquivos a serem becapeados, recebe</span>
+<span class="sd">    um arquivo compactado com os arquivos solicitados, e armazena o arquivo</span>
+<span class="sd">    especificado num diretório passado como parâmetro. Possui como parâmetros</span>
+<span class="sd">    de entrada o endereço &quot;ip&quot; do host alvo; o número da &quot;porta&quot; que a</span>
+<span class="sd">    aplicação remota do host alvo utiliza para receber requisições; a &quot;senha&quot;</span>
+<span class="sd">    para se contactar ao host alvo; uma tupla com a relação de &quot;arquivos&quot; que</span>
+<span class="sd">    serão becapeados; e o &quot;local&quot; onde o arquivo compactado de backup será</span>
+<span class="sd">    armazenado.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c"># Tenta fazer conexão com host remoto</span>
+    <span class="n">s_ssl</span> <span class="o">=</span> <span class="n">cria_socket</span><span class="p">(</span><span class="n">ip</span><span class="p">,</span> <span class="n">porta</span><span class="p">)</span>
+
+<span class="c"># 1a. conexão: ENVIANDO =======================================================</span>
+    <span class="c"># Envia senha para conexão ao host</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">senha</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLError</span><span class="p">:</span>
+        <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Erro ao enviar senha&#39;</span><span class="p">)</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="nb">exit</span><span class="p">()</span>
+
+<span class="c"># 2a. conexão: RECEBENDO ======================================================</span>
+    <span class="c"># Recebe status da aceitação ou não da senha</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">recebido</span> <span class="o">=</span> <span class="n">s_ssl</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLError</span><span class="p">:</span>
+        <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Conexão encerrada por {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ip</span><span class="p">))</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="nb">exit</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">recebido</span> <span class="o">==</span> <span class="s">&#39;Senha incorreta&#39;</span><span class="p">:</span>
+        <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Senha incorreta do host {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ip</span><span class="p">))</span>
+        <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Encerrando conexão com {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ip</span><span class="p">))</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="nb">exit</span><span class="p">()</span>
+
+<span class="c"># 3a. conexão: ENVIANDO =======================================================</span>
+    <span class="c"># Enviando uma tupla com a relação de arquivos para backup</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">arquivos</span><span class="p">))</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Erro ao enviar relação de arquivos&#39;</span><span class="p">)</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="nb">exit</span><span class="p">()</span>
+
+<span class="c"># 4a. conexão: RECEBENDO ======================================================</span>
+    <span class="c"># Recebendo o nome do arquivo compactado</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">recebido</span> <span class="o">=</span> <span class="n">s_ssl</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLError</span><span class="p">:</span>
+        <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Conexão encerrada por {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ip</span><span class="p">))</span>
+        <span class="n">s_ssl</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="nb">exit</span><span class="p">()</span>
+
+    <span class="n">name_file</span> <span class="o">=</span> <span class="n">recebido</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span>
+
+<span class="c"># 5a. conexão: RECEBENDO ======================================================</span>
+    <span class="c"># Recebendo e gravando o arquivo compactado</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">local</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s">&#39;/&#39;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">local</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">local</span> <span class="o">=</span> <span class="s">&#39;{}/&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">recebido</span> <span class="o">=</span> <span class="n">s_ssl</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLError</span><span class="p">:</span>
+            <span class="k">break</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">recebido</span><span class="p">:</span>
+            <span class="k">break</span>
+
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;{0}{1}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local</span><span class="p">,</span> <span class="n">name_file</span><span class="p">),</span> <span class="s">&#39;ab&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">recebido</span><span class="p">)</span>
+
+    <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Arquivo {0} copiado de {1}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_file</span><span class="p">,</span> <span class="n">ip</span><span class="p">))</span>
+
+    <span class="c"># Encerrando a conexão</span>
+    <span class="n">s_ssl</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c"># Verifica se foi passado algum parâmetro</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="nb">exit</span><span class="p">(</span><span class="s">&#39;Forma de uso: ./backup_server.py&#39;</span><span class="p">)</span>
+
+    <span class="c"># RegExp para determinar o nome do arquivo com os parâmetros de um host</span>
+    <span class="n">p0</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">r&#39;hosts/(.+?).py&#39;</span><span class="p">)</span>
+
+    <span class="c"># Importa as configurações de cada host alvo separadamente</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">glob</span><span class="o">.</span><span class="n">iglob</span><span class="p">(</span><span class="s">&#39;hosts/[!__]*.py&#39;</span><span class="p">):</span>
+        <span class="n">name_file</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">p0</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">name_module</span> <span class="o">=</span> <span class="s">&#39;hosts.{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_file</span><span class="p">)</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&#39;import {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_module</span><span class="p">))</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&#39;ip = hosts.{}.IP&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_file</span><span class="p">))</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&#39;porta = hosts.{}.PORTA&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_file</span><span class="p">))</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&#39;senha = hosts.{}.SENHA&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_file</span><span class="p">))</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&#39;arquivos = hosts.{}.ARQUIVOS&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_file</span><span class="p">))</span>
+
+        <span class="c"># Verifica se ip é válido</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ipaddr</span><span class="o">.</span><span class="n">IPv4Address</span><span class="p">(</span><span class="n">ip</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">AddressValueError</span><span class="p">:</span>
+            <span class="n">gera_log</span><span class="p">(</span><span class="s">&#39;Formato de ip inválido: {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ip</span><span class="p">))</span>
+
+        <span class="c"># Cria as threads utilizadas em cada host</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">backup</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">ip</span><span class="p">,</span> <span class="n">porta</span><span class="p">,</span> <span class="n">senha</span><span class="p">,</span>
+                                                  <span class="n">arquivos</span><span class="p">,</span> <span class="n">LOCAL</span><span class="p">))</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+        <span class="c"># Limpa as variáves individuais de cada host</span>
+        <span class="k">del</span> <span class="n">ip</span><span class="p">,</span> <span class="n">porta</span><span class="p">,</span> <span class="n">senha</span><span class="p">,</span> <span class="n">arquivos</span>
+        <span class="k">exec</span><span class="p">(</span><span class="s">&#39;del {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name_module</span><span class="p">))</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">Servidor Central de Backup 0.0.1 documentation</a> &raquo;</li>
+          <li><a href="index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2012, Herlon Camargo.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>
